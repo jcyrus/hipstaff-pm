@@ -1,21 +1,27 @@
 {
   "name": "hipstaff-pm-monorepo",
   "private": true,
+  "packageManager": "yarn@1.22.22",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "yarn workspace client dev",
-    "build": "yarn workspace client build && yarn workspace server build",
-    "start": "yarn workspace client start",
-    "lint": "yarn workspace client lint && yarn workspace server lint",
-    "dev:client": "yarn workspace client dev",
-    "dev:server": "yarn workspace server dev",
-    "build:client": "yarn workspace client build",
-    "build:server": "yarn workspace server build"
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "start": "turbo start",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "dev:client": "turbo dev --filter=client",
+    "dev:server": "turbo dev --filter=hipstaff-project-server",
+    "build:client": "turbo build --filter=client",
+    "build:server": "turbo build --filter=hipstaff-project-server",
+    "lint:client": "turbo lint --filter=client",
+    "lint:server": "turbo lint --filter=hipstaff-project-server"
   },
   "devDependencies": {
-    "prettier": "^3.3.3"
+    "prettier": "^3.3.3",
+    "turbo": "^2.5.5"
   }
 }

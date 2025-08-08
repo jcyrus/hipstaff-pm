@@ -1,6 +1,6 @@
 # HipStaff PM - Monorepo
 
-A full-stack project management application built with Next.js and Node.js.
+A full-stack project management application built with Next.js and Node.js, powered by Turborepo.
 
 ## Structure
 
@@ -13,33 +13,71 @@ A full-stack project management application built with Next.js and Node.js.
 ### Prerequisites
 
 - Node.js 18+ 
-- npm or pnpm
+- Yarn 1.22+
 
 ### Installation
 
 ```bash
 # Install dependencies for all apps
-npm install
-
-# Start development servers
-npm run dev:client  # Frontend (Next.js)
-npm run dev:server  # Backend (Express + Prisma)
+yarn install
 ```
 
-### Available Scripts
+## Development
 
-- `npm run dev` - Start client in development mode
-- `npm run dev:client` - Start client only
-- `npm run dev:server` - Start server only
-- `npm run build` - Build both client and server
-- `npm run build:client` - Build client only
-- `npm run build:server` - Build server only
+### Using Turborepo Commands
+
+```bash
+# Start both applications in development mode
+yarn dev
+
+# Start specific applications
+yarn dev:client    # Frontend only (Next.js)
+yarn dev:server    # Backend only (Express + Prisma)
+
+# Build all applications
+yarn build
+
+# Build specific applications  
+yarn build:client  # Build client only
+yarn build:server  # Build server only
+
+# Lint all applications
+yarn lint
+
+# Type check all applications
+yarn type-check
+
+# Clean all build artifacts
+yarn clean
+```
+
+### Turborepo Benefits
+
+- **Fast builds**: Intelligent caching and parallelization
+- **Task orchestration**: Dependency-aware task execution
+- **Remote caching**: Share cache across team and CI/CD
+- **Incremental builds**: Only rebuild what changed
+
+### Running with Filters
+
+You can target specific apps using Turborepo filters:
+
+```bash
+# Run dev for client only
+turbo dev --filter=client
+
+# Build server only
+turbo build --filter=hipstaff-project-server
+
+# Lint both apps
+turbo lint --filter=client --filter=hipstaff-project-server
+```
 
 ## Applications
 
 ### Client (`apps/client`)
-- **Framework**: Next.js 15 with Turbopack
-- **UI**: React 19 RC, Material-UI, Tailwind CSS
+- **Framework**: Next.js 15 with React 19 RC
+- **UI**: Material-UI, Tailwind CSS
 - **State Management**: Redux Toolkit
 - **Features**: Project management dashboard, task tracking, team collaboration
 
@@ -48,6 +86,12 @@ npm run dev:server  # Backend (Express + Prisma)
 - **Database**: Prisma ORM
 - **Features**: REST API for projects, tasks, teams, and users
 
-## Development
+## Turborepo Configuration
 
-This is a monorepo using npm workspaces. Each app can be developed independently while sharing common configurations and dependencies when needed.
+The monorepo is configured with:
+- Caching for `build`, `lint`, and `type-check` tasks
+- Output caching for `.next/**` and `dist/**` directories
+- Dependency awareness between tasks
+- Environment variable tracking
+
+See `turbo.json` for detailed configuration.

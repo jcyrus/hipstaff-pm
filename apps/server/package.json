@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rimraf dist && npx tsc",
-    "start": "npm run build && node dist/index.js",
-    "dev": "npm run build && concurrently \"npx tsc -w\" \"nodemon --exec ts-node src/index.ts\"",
-    "seed": "ts-node prisma/seed.ts"
+    "start": "node dist/index.js",
+    "dev": "concurrently \"npx tsc -w\" \"nodemon --exec ts-node src/index.ts\"",
+    "lint": "echo \"No linting configured yet\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "seed": "ts-node prisma/seed.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
