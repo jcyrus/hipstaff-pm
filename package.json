@@ -6,14 +6,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/client",
-    "build": "npm run build --workspace=apps/client && npm run build --workspace=apps/server",
-    "start": "npm run start --workspace=apps/client",
-    "lint": "npm run lint --workspace=apps/client && npm run lint --workspace=apps/server",
-    "dev:client": "npm run dev --workspace=apps/client",
-    "dev:server": "npm run dev --workspace=apps/server",
-    "build:client": "npm run build --workspace=apps/client",
-    "build:server": "npm run build --workspace=apps/server"
+    "dev": "yarn workspace client dev",
+    "build": "yarn workspace client build && yarn workspace server build",
+    "start": "yarn workspace client start",
+    "lint": "yarn workspace client lint && yarn workspace server lint",
+    "dev:client": "yarn workspace client dev",
+    "dev:server": "yarn workspace server dev",
+    "build:client": "yarn workspace client build",
+    "build:server": "yarn workspace server build"
   },
   "devDependencies": {
     "prettier": "^3.3.3"
