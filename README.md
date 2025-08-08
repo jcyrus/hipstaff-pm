@@ -1,6 +1,6 @@
-# HipStaff PM - Monorepo
+# HipStaff PM Tool - Monorepo
 
-A full-stack project management application built with Next.js and Node.js, powered by Turborepo.
+A full-stack project management application built with Next.js and Node.js, powered by Turborepo and Cyrus's coffe and AI tools :D.
 
 ## Structure
 
@@ -12,7 +12,7 @@ A full-stack project management application built with Next.js and Node.js, powe
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - Yarn 1.22+
 
 ### Installation
@@ -37,7 +37,7 @@ yarn dev:server    # Backend only (Express + Prisma)
 # Build all applications
 yarn build
 
-# Build specific applications  
+# Build specific applications
 yarn build:client  # Build client only
 yarn build:server  # Build server only
 
@@ -76,12 +76,14 @@ turbo lint --filter=client --filter=hipstaff-project-server
 ## Applications
 
 ### Client (`apps/client`)
+
 - **Framework**: Next.js 15 with React 19 RC
 - **UI**: Material-UI, Tailwind CSS
 - **State Management**: Redux Toolkit
 - **Features**: Project management dashboard, task tracking, team collaboration
 
 ### Server (`apps/server`)
+
 - **Framework**: Node.js with Express
 - **Database**: Prisma ORM
 - **Features**: REST API for projects, tasks, teams, and users
@@ -89,6 +91,7 @@ turbo lint --filter=client --filter=hipstaff-project-server
 ## Turborepo Configuration
 
 The monorepo is configured with:
+
 - Caching for `build`, `lint`, and `type-check` tasks
 - Output caching for `.next/**` and `dist/**` directories
 - Dependency awareness between tasks

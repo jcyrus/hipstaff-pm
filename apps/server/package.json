@@ -5,7 +5,8 @@
   "scripts": {
     "build": "rimraf dist && npx tsc",
     "start": "node dist/index.js",
-    "dev": "concurrently \"npx tsc -w\" \"nodemon --exec ts-node src/index.ts\"",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev:watch": "concurrently \"npx tsc -w\" \"nodemon --exec ts-node src/index.ts\"",
     "lint": "echo \"No linting configured yet\"",
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist",
