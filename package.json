@@ -1,55 +1,21 @@
 {
-  "name": "client",
-  "version": "0.1.0",
+  "name": "hipstaff-pm-monorepo",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@aws-amplify/ui-react": "^6.2.0",
-    "@emotion/react": "^11.13.0",
-    "@emotion/styled": "^11.13.0",
-    "@mui/material": "^5.16.6",
-    "@mui/x-data-grid": "^7.12.0",
-    "@reduxjs/toolkit": "^2.2.7",
-    "aws-amplify": "^6.5.1",
-    "axios": "^1.7.3",
-    "date-fns": "^3.6.0",
-    "dotenv": "^16.4.5",
-    "gantt-task-react": "^0.3.9",
-    "lodash": "^4.17.21",
-    "lucide-react": "^0.424.0",
-    "next": "15.0.2",
-    "numeral": "^2.0.6",
-    "react": "19.0.0-rc-02c0e824-20241028",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
-    "react-dom": "19.0.0-rc-02c0e824-20241028",
-    "react-redux": "^9.1.2",
-    "recharts": "^2.12.7",
-    "redux-persist": "^6.0.0"
+    "dev": "npm run dev --workspace=apps/client",
+    "build": "npm run build --workspace=apps/client && npm run build --workspace=apps/server",
+    "start": "npm run start --workspace=apps/client",
+    "lint": "npm run lint --workspace=apps/client && npm run lint --workspace=apps/server",
+    "dev:client": "npm run dev --workspace=apps/client",
+    "dev:server": "npm run dev --workspace=apps/server",
+    "build:client": "npm run build --workspace=apps/client",
+    "build:server": "npm run build --workspace=apps/server"
   },
   "devDependencies": {
-    "@types/lodash": "^4.17.7",
-    "@types/node": "^20.14.14",
-    "@types/numeral": "^2.0.5",
-    "@types/react": "npm:types-react@19.0.0-rc.1",
-    "@types/react-dom": "npm:types-react-dom@19.0.0-rc.1",
-    "@types/uuid": "^10.0.0",
-    "eslint": "^8",
-    "eslint-config-next": "15.0.2",
-    "postcss": "^8",
-    "prettier": "^3.3.3",
-    "prettier-plugin-tailwindcss": "^0.6.5",
-    "tailwind-merge": "^2.4.0",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  },
-  "overrides": {
-    "@types/react": "npm:types-react@19.0.0-rc.1",
-    "@types/react-dom": "npm:types-react-dom@19.0.0-rc.1"
+    "prettier": "^3.3.3"
   }
 }
