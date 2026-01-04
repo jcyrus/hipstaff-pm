@@ -35,6 +35,12 @@ Thumbs.db
 .turbo/
 dist/
 build/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
 # Logs
 *.log
