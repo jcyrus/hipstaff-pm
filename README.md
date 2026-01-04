@@ -1,100 +1,76 @@
-# HipStaff PM Tool - Monorepo
+# HipStaff PM
 
-A full-stack project management application built with Next.js and Node.js, powered by Turborepo and Cyrus's coffe and AI tools :D.
+A full-stack project management application built with Next.js 15 and Supabase.
 
-## Structure
+## Tech Stack
 
-- `apps/client`: Next.js frontend application
-- `apps/server`: Node.js/Express backend API with Prisma
-- `packages/`: Shared packages (for future use)
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- Yarn 1.22+
-
-### Installation
-
-```bash
-# Install dependencies for all apps
-yarn install
-```
-
-## Development
-
-### Using Turborepo Commands
-
-```bash
-# Start both applications in development mode
-yarn dev
-
-# Start specific applications
-yarn dev:client    # Frontend only (Next.js)
-yarn dev:server    # Backend only (Express + Prisma)
-
-# Build all applications
-yarn build
-
-# Build specific applications
-yarn build:client  # Build client only
-yarn build:server  # Build server only
-
-# Lint all applications
-yarn lint
-
-# Type check all applications
-yarn type-check
-
-# Clean all build artifacts
-yarn clean
-```
-
-### Turborepo Benefits
-
-- **Fast builds**: Intelligent caching and parallelization
-- **Task orchestration**: Dependency-aware task execution
-- **Remote caching**: Share cache across team and CI/CD
-- **Incremental builds**: Only rebuild what changed
-
-### Running with Filters
-
-You can target specific apps using Turborepo filters:
-
-```bash
-# Run dev for client only
-turbo dev --filter=client
-
-# Build server only
-turbo build --filter=hipstaff-project-server
-
-# Lint both apps
-turbo lint --filter=client --filter=hipstaff-project-server
-```
-
-## Applications
-
-### Client (`apps/client`)
-
-- **Framework**: Next.js 15 with React 19 RC
+- **Frontend**: Next.js 15, React 19, TypeScript
 - **UI**: Material-UI, Tailwind CSS
-- **State Management**: Redux Toolkit
-- **Features**: Project management dashboard, task tracking, team collaboration
+- **State**: Redux Toolkit (RTK Query)
+- **Database**: Supabase (PostgreSQL)
+- **Deployment**: Vercel
 
-### Server (`apps/server`)
+## Quick Start
 
-- **Framework**: Node.js with Express
-- **Database**: Prisma ORM
-- **Features**: REST API for projects, tasks, teams, and users
+```bash
+# Install dependencies
+pnpm install
 
-## Turborepo Configuration
+# Copy environment variables
+cp .env.example .env.local
 
-The monorepo is configured with:
+# Add your Supabase credentials to .env.local
 
-- Caching for `build`, `lint`, and `type-check` tasks
-- Output caching for `.next/**` and `dist/**` directories
-- Dependency awareness between tasks
-- Environment variable tracking
+# Start development server
+pnpm dev
+```
 
-See `turbo.json` for detailed configuration.
+## Deployment
+
+See [DEPLOY.md](./DEPLOY.md) for one-click Vercel deployment instructions.
+
+## Project Structure
+
+```
+src/
+  app/
+    api/          # Next.js API routes (Supabase integration)
+    home/         # Dashboard home page
+    projects/     # Project management views
+    priority/     # Task priority pages
+    search/       # Search functionality
+    settings/     # User settings
+    teams/        # Team management
+    timeline/     # Timeline view
+    users/        # User management
+  components/     # Reusable UI components
+  lib/
+    supabase/     # Supabase client utilities
+  state/          # Redux store and RTK Query API
+supabase/
+  migrations/     # Database schema SQL
+```
+
+## Features
+
+- Project and task management
+- Drag-and-drop Kanban board
+- Timeline/Gantt view
+- Team collaboration
+- User assignments
+- Priority-based filtering
+- Search across projects, tasks, and users
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development server |
+| `pnpm build` | Build for production |
+| `pnpm start` | Start production server |
+| `pnpm lint` | Run ESLint |
+| `pnpm type-check` | Run TypeScript checks |
+
+## License
+
+MIT

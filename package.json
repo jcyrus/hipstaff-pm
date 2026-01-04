@@ -1,27 +1,56 @@
 {
-  "name": "hipstaff-pm-monorepo",
+  "name": "hipstaff-pm",
+  "version": "0.8.0",
   "private": true,
-  "packageManager": "yarn@1.22.22",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev",
-    "lint": "turbo lint",
-    "start": "turbo start",
-    "type-check": "turbo type-check",
-    "clean": "turbo clean",
-    "dev:client": "turbo dev --filter=client",
-    "dev:server": "turbo dev --filter=hipstaff-project-server",
-    "build:client": "turbo build --filter=client",
-    "build:server": "turbo build --filter=hipstaff-project-server",
-    "lint:client": "turbo lint --filter=client",
-    "lint:server": "turbo lint --filter=hipstaff-project-server"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@mui/material": "^5.16.6",
+    "@mui/x-data-grid": "^7.12.0",
+    "@reduxjs/toolkit": "^2.2.7",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.47.10",
+    "date-fns": "^3.6.0",
+    "gantt-task-react": "^0.3.9",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.424.0",
+    "next": "16.1.1",
+    "nextjs-toploader": "^3.9.17",
+    "numeral": "^2.0.6",
+    "react": "19.2.3",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "19.2.3",
+    "react-redux": "^9.1.2",
+    "recharts": "^2.12.7",
+    "redux-persist": "^6.0.0"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.7",
+    "@types/node": "^20.14.14",
+    "@types/numeral": "^2.0.5",
+    "@types/react": "npm:types-react@19.0.0-rc.1",
+    "@types/react-dom": "npm:types-react-dom@19.0.0-rc.1",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^8",
+    "eslint-config-next": "16.1.1",
+    "postcss": "^8",
     "prettier": "^3.3.3",
-    "turbo": "^2.5.5"
-  }
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "tailwind-merge": "^2.4.0",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "@types/react": "npm:types-react@19.0.0-rc.1",
+    "@types/react-dom": "npm:types-react-dom@19.0.0-rc.1"
+  },
+  "packageManager": "pnpm@10.25.0+sha512.5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501"
 }
