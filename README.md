@@ -37,8 +37,7 @@ See [DEPLOY.md](./DEPLOY.md) for deployment instructions.
 
 ## Project Structure
 
-```
-src/
+```text
   app/
     api/          # Next.js API routes (Prisma + Auth.js)
     (auth)/       # Login page

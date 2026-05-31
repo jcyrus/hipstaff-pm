@@ -34,7 +34,7 @@ This applies all migrations from `prisma/migrations/` to your database. It's saf
    - `NEXTAUTH_URL` — your Vercel deployment URL (e.g. `https://hipstaff-pm.vercel.app`)
    - `NEXT_PUBLIC_APP_URL` — same as `NEXTAUTH_URL`
 4. Add a build command override if needed:
-   ```
+   ```bash
    pnpm prisma migrate deploy && pnpm build
    ```
 5. Deploy.
