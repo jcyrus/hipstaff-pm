@@ -1,9 +1,17 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { PrismaClient, UserRole } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import * as readline from "readline/promises";
 import { stdin as input, stdout as output } from "process";
+
+// Load .env before constructing PrismaClient (Prisma CLI uses prisma.config.ts for this,
+// but tsx running seed.ts directly needs explicit dotenv loading with an absolute path)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, "../.env") });
+config({ path: resolve(__dirname, "../.env.local"), override: false });
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
