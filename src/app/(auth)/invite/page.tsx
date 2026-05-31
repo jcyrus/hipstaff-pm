@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function InvitePage() {
   const searchParams = useSearchParams();
@@ -18,77 +17,29 @@ export default function InvitePage() {
         return;
       }
 
-      const supabase = getSupabaseClient();
+      try {
+        const res = await fetch("/api/invite/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
 
-      const { data: invite, error: inviteError } = await supabase
-        .from("invites")
-        .select("*")
-        .eq("token", token)
-        .single();
+        const data = await res.json();
 
-      if (inviteError || !invite) {
-        setStatus("invalid");
-        setMessage("Invalid or expired invitation");
-        return;
-      }
-
-      if (invite.revoked_at) {
-        setStatus("invalid");
-        setMessage("This invitation has been revoked");
-        return;
-      }
-
-      if (invite.accepted_at) {
-        setStatus("invalid");
-        setMessage("This invitation has already been accepted");
-        return;
-      }
-
-      if (new Date(invite.expires_at) < new Date()) {
-        setStatus("invalid");
-        setMessage("This invitation has expired");
-        return;
-      }
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user) {
+        if (res.ok) {
+          setStatus("success");
+          setMessage("You have been successfully added to the team!");
+        } else if (res.status === 401) {
+          setStatus("error");
+          setMessage(data.message || "Please sign in to accept the invitation");
+        } else {
+          setStatus(res.status === 400 ? "invalid" : "error");
+          setMessage(data.message || "Failed to accept invitation");
+        }
+      } catch {
         setStatus("error");
-        setMessage("Please sign in to accept the invitation");
-        return;
+        setMessage("An unexpected error occurred");
       }
-
-      const { data: userData, error: userDataError } = await supabase
-        .from("users")
-        .select("user_id")
-        .eq("supabase_user_id", user.id)
-        .single();
-
-      if (userDataError) {
-        setStatus("error");
-        setMessage("Failed to fetch user data");
-        return;
-      }
-
-      const { error: memberError } = await supabase.from("user_teams").insert({
-        user_id: userData.user_id,
-        team_id: invite.team_id,
-        role: invite.role,
-      });
-
-      if (memberError) {
-        setStatus("error");
-        setMessage("Failed to add you to the team");
-        return;
-      }
-
-      await supabase
-        .from("invites")
-        .update({ accepted_at: new Date().toISOString() })
-        .eq("id", invite.id);
-
-      setStatus("success");
-      setMessage("You have been successfully added to the team!");
     }
 
     acceptInvite();

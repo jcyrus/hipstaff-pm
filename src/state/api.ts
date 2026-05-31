@@ -24,12 +24,11 @@ export enum Status {
 }
 
 export interface User {
-  userId?: number;
+  userId?: string;
   username: string;
   email: string;
   profilePictureUrl?: string;
-  supabaseUserId?: string;
-  teamId?: number;
+  teamId?: string;
 }
 
 export interface Attachment {
@@ -51,8 +50,8 @@ export interface Task {
   dueDate?: string;
   points?: number;
   projectId: number;
-  authorUserId?: number;
-  assignedUserId?: number;
+  authorUserId?: string;
+  assignedUserId?: string;
 
   author?: User;
   assignee?: User;
@@ -99,7 +98,7 @@ export const api = createApi({
           ? result.map(({ id }) => ({ type: "Tasks" as const, id }))
           : [{ type: "Tasks" as const }],
     }),
-    getTasksByUser: build.query<Task[], number>({
+    getTasksByUser: build.query<Task[], string>({
       query: (userId) => `tasks/user/${userId}`,
       providesTags: (result, error, userId) =>
         result

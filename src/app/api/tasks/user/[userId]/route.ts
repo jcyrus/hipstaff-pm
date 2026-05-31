@@ -1,30 +1,31 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const supabase = await createClient();
-  const { userId } = await params;
-
-  const { data: tasks, error } = await supabase
-    .from("tasks")
-    .select(
-      `
-      *,
-      author:users!tasks_author_user_id_fkey(*),
-      assignee:users!tasks_assigned_user_id_fkey(*)
-    `
-    )
-    .or(`author_user_id.eq.${userId},assigned_user_id.eq.${userId}`);
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error retrieving user's tasks: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(tasks);
+  const { userId } = await params;
+
+  try {
+    const tasks = await prisma.task.findMany({
+      where: {
+        OR: [{ authorUserId: userId }, { assignedUserId: userId }],
+      },
+      include: {
+        author: true,
+        assignee: true,
+      },
+    });
+    return NextResponse.json(tasks);
+  } catch {
+    return NextResponse.json({ message: "Error retrieving tasks" }, { status: 500 });
+  }
 }

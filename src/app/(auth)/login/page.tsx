@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginForm() {
@@ -12,25 +12,26 @@ function LoginForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/home";
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const rawRedirect = searchParams.get("redirect") || "/home";
+  // Only allow relative paths to prevent open redirect attacks
+  const redirect =
+    rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/home";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const result = await signIn("credentials", {
       email,
       password,
+      redirect: false,
     });
 
-    if (error) {
-      setError(error.message);
+    if (result?.error) {
+      setError("Invalid email or password");
       setLoading(false);
       return;
     }

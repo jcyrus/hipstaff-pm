@@ -1,103 +1,103 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { logTeamMemberAdded, logTeamMemberRemoved } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { UserRole } from "@/lib/rbac/types";
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
-  const { teamId } = await params;
-
-  const { data: members, error } = await supabase
-    .from("user_teams")
-    .select(`
-      id,
-      user_id,
-      role,
-      is_active,
-      users (username, email)
-    `)
-    .eq("team_id", parseInt(teamId));
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error fetching team members: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(members);
+  const { teamId } = await params;
+
+  try {
+    const members = await prisma.userTeam.findMany({
+      where: { teamId: parseInt(teamId) },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        isActive: true,
+        user: { select: { username: true, email: true } },
+      },
+    });
+
+    // Transform to match admin page snake_case expectations
+    const transformed = members.map((m) => ({
+      id: m.id,
+      user_id: m.userId,
+      role: m.role,
+      is_active: m.isActive,
+      users: { username: m.user.username, email: m.user.email },
+    }));
+
+    return NextResponse.json(transformed);
+  } catch {
+    return NextResponse.json({ message: "Error fetching team members" }, { status: 500 });
+  }
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
+  let admin;
+  try {
+    admin = await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { teamId } = await params;
+  const teamIdInt = parseInt(teamId);
   const body = await request.json();
 
-  const { data: existingMember, error: checkError } = await supabase
-    .from("user_teams")
-    .select()
-    .eq("user_id", body.userId)
-    .eq("team_id", parseInt(teamId))
-    .single();
+  try {
+    const existingMember = await prisma.userTeam.findUnique({
+      where: { userId_teamId: { userId: body.userId, teamId: teamIdInt } },
+    });
 
-  if (checkError) {
-    return NextResponse.json(
-      { message: `Error checking existing membership: ${checkError.message}` },
-      { status: 500 }
-    );
-  }
-
-  if (existingMember) {
-    const { data, error: updateError } = await supabase
-      .from("user_teams")
-      .update({ role: body.role || UserRole.Member })
-      .eq("id", existingMember.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return NextResponse.json(
-        { message: `Error updating team member: ${updateError.message}` },
-        { status: 500 }
-      );
+    if (existingMember) {
+      const updated = await prisma.userTeam.update({
+        where: { id: existingMember.id },
+        data: { role: body.role || UserRole.Member },
+      });
+      return NextResponse.json(updated);
     }
 
-    return NextResponse.json(data);
+    const newMember = await prisma.userTeam.create({
+      data: {
+        userId: body.userId,
+        teamId: teamIdInt,
+        role: body.role || UserRole.Member,
+      },
+    });
+
+    await logTeamMemberAdded(admin.id, teamIdInt, body.userId, body.role || UserRole.Member);
+
+    return NextResponse.json(newMember, { status: 201 });
+  } catch {
+    return NextResponse.json({ message: "Error managing team member" }, { status: 500 });
   }
-
-  const { data: newMember, error } = await supabase.from("user_teams").insert({
-    user_id: body.userId,
-    team_id: parseInt(teamId),
-    role: body.role || UserRole.Member,
-  }).select().single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error adding team member: ${error.message}` },
-      { status: 500 }
-    );
-  }
-
-  await logTeamMemberAdded(admin.id, parseInt(teamId), body.userId, body.role || UserRole.Member);
-
-  return NextResponse.json(newMember, { status: 201 });
 }
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
+  let admin;
+  try {
+    admin = await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { teamId } = await params;
   const { searchParams } = new URL(request.url);
   const memberId = searchParams.get("memberId");
@@ -106,19 +106,21 @@ export async function DELETE(
     return NextResponse.json({ message: "memberId is required" }, { status: 400 });
   }
 
-  const { data: existingMember, error: fetchError } = await supabase
-    .from("user_teams")
-    .select("user_id")
-    .eq("id", parseInt(memberId))
-    .single();
+  try {
+    const existingMember = await prisma.userTeam.findUnique({
+      where: { id: parseInt(memberId) },
+      select: { userId: true },
+    });
 
-  if (fetchError || !existingMember) {
-    return NextResponse.json({ message: "Team member not found" }, { status: 404 });
+    if (!existingMember) {
+      return NextResponse.json({ message: "Team member not found" }, { status: 404 });
+    }
+
+    await prisma.userTeam.delete({ where: { id: parseInt(memberId) } });
+    await logTeamMemberRemoved(admin.id, parseInt(teamId), existingMember.userId);
+
+    return NextResponse.json({ message: "Team member removed successfully" });
+  } catch {
+    return NextResponse.json({ message: "Error removing team member" }, { status: 500 });
   }
-
-  await supabase.from("user_teams").delete().eq("id", parseInt(memberId));
-
-  await logTeamMemberRemoved(admin.id, parseInt(teamId), existingMember.user_id);
-
-  return NextResponse.json({ message: "Team member removed successfully" });
 }

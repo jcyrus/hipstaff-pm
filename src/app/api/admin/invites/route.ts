@@ -1,75 +1,90 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { logInviteCreated, logInviteAccepted, logInviteRevoked } from "@/lib/audit";
+import { logInviteCreated, logInviteRevoked } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { UserRole } from "@/lib/rbac/types";
 import { addDays } from "date-fns";
 
 export async function GET() {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
-
-  const { data: invites, error } = await supabase
-    .from("invites")
-    .select(`
-      id,
-      token,
-      email,
-      team_id,
-      role,
-      expires_at,
-      accepted_at,
-      revoked_at,
-      created_by,
-      teams (team_name)
-    `)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error fetching invites: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(invites);
+  try {
+    const invites = await prisma.invite.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { team: { select: { teamName: true } } },
+    });
+
+    // Transform to match admin page snake_case expectations
+    const transformed = invites.map((i) => ({
+      id: i.id,
+      token: i.token,
+      email: i.email,
+      team_id: i.teamId,
+      role: i.role,
+      expires_at: i.expiresAt,
+      accepted_at: i.acceptedAt,
+      revoked_at: i.revokedAt,
+      created_by: i.createdBy,
+      teams: i.team ? { team_name: i.team.teamName } : null,
+    }));
+
+    return NextResponse.json(transformed);
+  } catch {
+    return NextResponse.json({ message: "Error fetching invites" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
-  const body = await request.json();
-
-  const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-  const expiresAt = addDays(new Date(), 7);
-
-  const { data: invite, error } = await supabase.from("invites").insert({
-    token,
-    email: body.email,
-    team_id: body.teamId,
-    role: body.role || UserRole.Member,
-    created_by: admin.id,
-    expires_at: expiresAt.toISOString(),
-  }).select().single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error creating invite: ${error.message}` },
-      { status: 500 }
-    );
+  let admin;
+  try {
+    admin = await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  await logInviteCreated(admin.id, body.email, body.teamId, body.role || UserRole.Member);
+  const body = await request.json();
 
-  return NextResponse.json({
-    inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite?token=${token}`,
-    expiresAt,
-  }, { status: 201 });
+  try {
+    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+    const expiresAt = addDays(new Date(), 7);
+
+    await prisma.invite.create({
+      data: {
+        token,
+        email: body.email,
+        teamId: body.teamId || null,
+        role: body.role || UserRole.Member,
+        createdBy: admin.id,
+        expiresAt,
+      },
+    });
+
+    await logInviteCreated(admin.id, body.email, body.teamId, body.role || UserRole.Member);
+
+    return NextResponse.json(
+      {
+        inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite?token=${token}`,
+        expiresAt,
+      },
+      { status: 201 }
+    );
+  } catch {
+    return NextResponse.json({ message: "Error creating invite" }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
-  const supabase = await createClient();
+  let admin;
+  try {
+    admin = await requireAdmin();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const inviteId = searchParams.get("inviteId");
 
@@ -77,29 +92,23 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "inviteId is required" }, { status: 400 });
   }
 
-  const { data: invite, error: fetchError } = await supabase
-    .from("invites")
-    .select()
-    .eq("id", parseInt(inviteId))
-    .single();
+  const inviteIdInt = parseInt(inviteId);
 
-  if (fetchError || !invite) {
-    return NextResponse.json({ message: "Invite not found" }, { status: 404 });
+  try {
+    const invite = await prisma.invite.findUnique({ where: { id: inviteIdInt } });
+    if (!invite) {
+      return NextResponse.json({ message: "Invite not found" }, { status: 404 });
+    }
+
+    await prisma.invite.update({
+      where: { id: inviteIdInt },
+      data: { revokedAt: new Date() },
+    });
+
+    await logInviteRevoked(admin.id, inviteIdInt);
+
+    return NextResponse.json({ message: "Invite revoked successfully" });
+  } catch {
+    return NextResponse.json({ message: "Error revoking invite" }, { status: 500 });
   }
-
-  const { error: updateError } = await supabase
-    .from("invites")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", parseInt(inviteId));
-
-  if (updateError) {
-    return NextResponse.json(
-      { message: `Error revoking invite: ${updateError.message}` },
-      { status: 500 }
-    );
-  }
-
-  await logInviteRevoked(admin.id, parseInt(inviteId));
-
-  return NextResponse.json({ message: "Invite revoked successfully" });
 }
