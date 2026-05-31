@@ -49,9 +49,7 @@ export async function POST(request: Request) {
   const body = await request.json();
 
   try {
-    const token =
-      Math.random().toString(36).substring(2) +
-      Math.random().toString(36).substring(2);
+    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     const expiresAt = addDays(new Date(), 7);
 
     await prisma.invite.create({

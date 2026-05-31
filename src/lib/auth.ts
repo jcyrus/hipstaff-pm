@@ -68,6 +68,13 @@ export async function switchTeam(
   userId: string,
   teamId: number
 ): Promise<void> {
+  const membership = await prisma.userTeam.findUnique({
+    where: { userId_teamId: { userId, teamId } },
+    select: { userId: true },
+  });
+  if (!membership) {
+    throw new Error("Forbidden: user is not a member of the requested team");
+  }
   await prisma.user.update({
     where: { id: userId },
     data: { currentTeamId: teamId },

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth";
-import { logUserCreated, logUserUpdated, logUserRoleChanged, logUserActivated, logUserDeactivated } from "@/lib/audit";
+import { logUserCreated, logUserUpdated, logUserDeleted, logUserRoleChanged, logUserActivated, logUserDeactivated } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { UserRole } from "@/lib/rbac/types";
 import bcrypt from "bcryptjs";
@@ -65,12 +65,17 @@ export async function POST(request: Request) {
 
   const body = await request.json();
 
+  const { email, username, password } = body;
+  if (!email || !username || !password) {
+    return NextResponse.json({ message: "email, username, and password are required" }, { status: 400 });
+  }
+
   try {
-    const hashedPassword = await bcrypt.hash(body.password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const newUser = await prisma.user.create({
       data: {
-        email: body.email,
-        username: body.username,
+        email,
+        username,
         password: hashedPassword,
         role: body.role || UserRole.Member,
         isActive: body.isActive !== false,
@@ -119,6 +124,20 @@ export async function PATCH(request: Request) {
     if (updates.username !== undefined) prismaUpdates.username = updates.username;
     if (updates.email !== undefined) prismaUpdates.email = updates.email;
 
+    const data = await prisma.user.update({
+      where: { id: userId },
+      data: prismaUpdates,
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        profilePictureUrl: true,
+      },
+    });
+
     if (updates.role && updates.role !== existingUser.role) {
       await logUserRoleChanged(superAdmin.id, userId, existingUser.role, updates.role);
     }
@@ -132,11 +151,6 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const data = await prisma.user.update({
-      where: { id: userId },
-      data: prismaUpdates,
-    });
-
     await logUserUpdated(superAdmin.id, userId, updates);
 
     return NextResponse.json({ user_id: data.id, ...data });
@@ -146,8 +160,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  let superAdmin;
   try {
-    await requireSuperAdmin();
+    superAdmin = await requireSuperAdmin();
   } catch {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
@@ -171,6 +186,8 @@ export async function DELETE(request: Request) {
 
     // Cascade deletes sessions via Prisma relations (onDelete: Cascade)
     await prisma.user.delete({ where: { id: userId } });
+
+    await logUserDeleted(superAdmin.id, userId);
 
     return NextResponse.json({ message: "User deleted successfully" });
   } catch {

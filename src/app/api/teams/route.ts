@@ -14,7 +14,7 @@ export async function GET() {
       orderBy: { id: "asc" },
     });
     // Map id → teamId to match RTK Query Team interface
-    return NextResponse.json(teams.map((t) => ({ ...t, teamId: t.id })));
+    return NextResponse.json(teams.map((t) => ({ ...t, teamId: t.id, team_name: t.teamName })));
   } catch {
     return NextResponse.json({ message: "Error retrieving teams" }, { status: 500 });
   }

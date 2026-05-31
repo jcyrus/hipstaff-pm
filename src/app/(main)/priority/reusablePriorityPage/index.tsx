@@ -8,10 +8,10 @@ import { dataGridClassNames, dataGridSxStyles } from "@/lib/utils";
 import {
   Priority,
   Task,
-  // useGetAuthUserQuery,
   useGetTasksByUserQuery,
 } from "@/state/api";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { useSession } from "next-auth/react";
 import React, { useState } from "react";
 
 type Props = {
@@ -77,14 +77,13 @@ const ReusablePriorityPage = ({ priority }: Props) => {
   const [view, setView] = useState("list");
   const [isModalNewTaskOpen, setIsModalNewTaskOpen] = useState(false);
 
-  // const { data: currentUser } = useGetAuthUserQuery({});
-  // const userId = currentUser?.userDetails?.userId ?? null;
-  const userId = 1;
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
   const {
     data: tasks,
     isLoading,
     isError: isTasksError,
-  } = useGetTasksByUserQuery(userId || 0, {
+  } = useGetTasksByUserQuery(userId ?? "", {
     skip: userId === null,
   });
 

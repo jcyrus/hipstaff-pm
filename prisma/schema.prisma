@@ -168,6 +168,7 @@ model ProjectTeam {
   team    Team    @relation(fields: [teamId], references: [id])
   project Project @relation(fields: [projectId], references: [id])
 
+  @@unique([teamId, projectId])
   @@map("project_teams")
 }
 
@@ -203,6 +204,7 @@ model TaskAssignment {
   user User @relation(fields: [userId], references: [id])
   task Task @relation(fields: [taskId], references: [id])
 
+  @@unique([userId, taskId])
   @@map("task_assignments")
 }
 
@@ -270,7 +272,7 @@ model AuditLog {
   action     AuditAction
   actorId    String
   targetType String
-  targetId   Int?
+  targetId   String?
   details    Json?
   createdAt  DateTime    @default(now())
 

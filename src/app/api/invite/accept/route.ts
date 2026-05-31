@@ -24,6 +24,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid or expired invitation" }, { status: 404 });
     }
 
+    if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
+      return NextResponse.json({ message: "This invitation was sent to a different email address" }, { status: 403 });
+    }
+
     if (invite.revokedAt) {
       return NextResponse.json({ message: "This invitation has been revoked" }, { status: 400 });
     }
