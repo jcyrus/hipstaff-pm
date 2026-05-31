@@ -1,43 +1,43 @@
 # Deploy HipStaff PM
 
-One-click deploy to Vercel:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjcyrus%2Fhipstaff-pm&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY&envDescription=Supabase%20credentials%20required&envLink=https%3A%2F%2Fsupabase.com%2Fdocs&project-name=hipstaff-pm&repository-name=hipstaff-pm)
-
 ## Prerequisites
 
-1. **Supabase Account**: Create a free account at [supabase.com](https://supabase.com)
-2. **Create a new Supabase project**
-
-## Setup Steps
-
-### 1. Database Setup
-
-Run the SQL migration in your Supabase SQL Editor:
-
-1. Go to your Supabase Dashboard
-2. Navigate to **SQL Editor**
-3. Copy the contents of `supabase/migrations/001_initial_schema.sql`
-4. Run the migration
-
-### 2. Get Your Credentials
-
-From your Supabase project dashboard:
-
-1. Go to **Project Settings** > **API**
-2. Copy the **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-3. Copy the **anon public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### 3. Deploy to Vercel
-
-Click the **Deploy with Vercel** button above and enter your Supabase credentials when prompted.
+- A PostgreSQL database (local, [Neon](https://neon.tech), [Supabase](https://supabase.com), Railway, etc.)
+- A hosting platform (Vercel recommended)
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous/public key |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | Random secret — generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Full URL of your deployment (e.g. `https://your-app.vercel.app`) |
+| `NEXT_PUBLIC_APP_URL` | Same as `NEXTAUTH_URL` (used in invite links) |
+
+## Database Setup
+
+Run the Prisma migrations to create all tables:
+
+```bash
+pnpm prisma migrate deploy
+```
+
+This applies all migrations from `prisma/migrations/` to your database. It's safe to run on every deploy.
+
+## Deploy to Vercel
+
+1. Push the repository to GitHub.
+2. Create a new Vercel project and link it to the repo.
+3. Add environment variables in **Settings > Environment Variables**:
+   - `DATABASE_URL` — your PostgreSQL connection string
+   - `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
+   - `NEXTAUTH_URL` — your Vercel deployment URL (e.g. `https://hipstaff-pm.vercel.app`)
+   - `NEXT_PUBLIC_APP_URL` — same as `NEXTAUTH_URL`
+4. Add a build command override if needed:
+   ```
+   pnpm prisma migrate deploy && pnpm build
+   ```
+5. Deploy.
 
 ## Local Development
 
@@ -51,11 +51,29 @@ pnpm install
 
 # Copy environment variables
 cp .env.example .env.local
+# Edit .env.local — set DATABASE_URL and NEXTAUTH_SECRET
 
-# Edit .env.local with your Supabase credentials
+# Apply schema to local database
+pnpm prisma migrate dev
 
 # Start development server
 pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
+
+## Creating the First Admin User
+
+After running migrations, seed an initial superadmin user:
+
+```bash
+pnpm prisma studio
+```
+
+Or use a direct INSERT with a bcrypt-hashed password (12 rounds):
+
+```sql
+INSERT INTO users (id, email, username, password, role, is_active)
+VALUES (gen_random_uuid(), 'admin@example.com', 'admin', '<bcrypt-hash>', 'SuperAdmin', true);
+```
+
