@@ -1,8 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth";
 import { logUserCreated, logUserUpdated, logUserRoleChanged, logUserActivated, logUserDeactivated } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { UserRole } from "@/lib/rbac/types";
+import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
@@ -10,36 +11,48 @@ export async function GET() {
   } catch {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  
-  const supabase = await createClient();
 
-  const { data: users, error } = await supabase
-    .from("users")
-    .select(`
-      user_id,
-      supabase_user_id,
-      username,
-      email,
-      role,
-      is_active,
-      created_at,
-      profile_picture_url,
-      user_teams (
-        team_id,
-        teams (team_name),
-        role
-      )
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        profilePictureUrl: true,
+        userTeams: {
+          select: {
+            teamId: true,
+            role: true,
+            team: { select: { teamName: true } },
+          },
+        },
+      },
+    });
 
-  if (error) {
-    return NextResponse.json(
-      { message: `Error fetching users: ${error.message}` },
-      { status: 500 }
-    );
+    // Transform to match admin page snake_case expectations
+    const transformed = users.map((u) => ({
+      user_id: u.id,
+      username: u.username,
+      email: u.email,
+      role: u.role,
+      is_active: u.isActive,
+      created_at: u.createdAt,
+      profile_picture_url: u.profilePictureUrl,
+      user_teams: u.userTeams.map((ut) => ({
+        team_id: ut.teamId,
+        role: ut.role,
+        teams: { team_name: ut.team.teamName },
+      })),
+    }));
+
+    return NextResponse.json(transformed);
+  } catch {
+    return NextResponse.json({ message: "Error fetching users" }, { status: 500 });
   }
-
-  return NextResponse.json(users);
 }
 
 export async function POST(request: Request) {
@@ -50,48 +63,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
   const body = await request.json();
 
-  const { data: newUser, error } = await supabase.auth.admin.createUser({
-    email: body.email,
-    password: body.password,
-    email_confirm: true,
-    user_metadata: {
+  try {
+    const hashedPassword = await bcrypt.hash(body.password, 12);
+    const newUser = await prisma.user.create({
+      data: {
+        email: body.email,
+        username: body.username,
+        password: hashedPassword,
+        role: body.role || UserRole.Member,
+        isActive: body.isActive !== false,
+      },
+    });
+
+    await logUserCreated(superAdmin.id, newUser.id, {
       username: body.username,
-    },
-  });
+      email: body.email,
+      role: body.role,
+    });
 
-  if (error || !newUser?.user) {
     return NextResponse.json(
-      { message: `Error creating auth user: ${error?.message || "Unknown error"}` },
-      { status: 400 }
+      { user_id: newUser.id, username: newUser.username, email: newUser.email },
+      { status: 201 }
     );
+  } catch {
+    return NextResponse.json({ message: "Error creating user" }, { status: 500 });
   }
-
-  const { data: userData, error: dbError } = await supabase.from("users").insert({
-    supabase_user_id: newUser.user.id,
-    username: body.username,
-    email: body.email,
-    role: body.role || UserRole.Member,
-    is_active: body.isActive !== false,
-  }).select().single();
-
-  if (dbError) {
-    await supabase.auth.admin.deleteUser(newUser.user.id);
-    return NextResponse.json(
-      { message: `Error creating user record: ${dbError.message}` },
-      { status: 500 }
-    );
-  }
-
-  await logUserCreated(superAdmin.id, userData.user_id, {
-    username: body.username,
-    email: body.email,
-    role: body.role,
-  });
-
-  return NextResponse.json(userData, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
@@ -102,49 +100,49 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
   const body = await request.json();
   const { userId, ...updates } = body;
 
-  const { data: existingUser, error: fetchError } = await supabase
-    .from("users")
-    .select("role, is_active")
-    .eq("user_id", userId)
-    .single();
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, isActive: true },
+    });
 
-  if (fetchError || !existingUser) {
-    return NextResponse.json({ message: "User not found" }, { status: 404 });
-  }
-
-  if (updates.role && updates.role !== existingUser.role) {
-    await logUserRoleChanged(superAdmin.id, userId, existingUser.role, updates.role);
-  }
-
-  if (updates.is_active !== undefined && updates.is_active !== existingUser.is_active) {
-    if (updates.is_active) {
-      await logUserActivated(superAdmin.id, userId);
-    } else {
-      await logUserDeactivated(superAdmin.id, userId);
+    if (!existingUser) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
+
+    const prismaUpdates: Record<string, unknown> = {};
+    if (updates.role !== undefined) prismaUpdates.role = updates.role;
+    if (updates.is_active !== undefined) prismaUpdates.isActive = updates.is_active;
+    if (updates.username !== undefined) prismaUpdates.username = updates.username;
+    if (updates.email !== undefined) prismaUpdates.email = updates.email;
+
+    if (updates.role && updates.role !== existingUser.role) {
+      await logUserRoleChanged(superAdmin.id, userId, existingUser.role, updates.role);
+    }
+
+    const isActiveUpdate = updates.is_active;
+    if (isActiveUpdate !== undefined && isActiveUpdate !== existingUser.isActive) {
+      if (isActiveUpdate) {
+        await logUserActivated(superAdmin.id, userId);
+      } else {
+        await logUserDeactivated(superAdmin.id, userId);
+      }
+    }
+
+    const data = await prisma.user.update({
+      where: { id: userId },
+      data: prismaUpdates,
+    });
+
+    await logUserUpdated(superAdmin.id, userId, updates);
+
+    return NextResponse.json({ user_id: data.id, ...data });
+  } catch {
+    return NextResponse.json({ message: "Error updating user" }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from("users")
-    .update(updates)
-    .eq("user_id", userId)
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error updating user: ${error.message}` },
-      { status: 500 }
-    );
-  }
-
-  await logUserUpdated(superAdmin.id, userId, updates);
-
-  return NextResponse.json(data);
 }
 
 export async function DELETE(request: Request) {
@@ -154,7 +152,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
 
@@ -162,19 +159,21 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "userId is required" }, { status: 400 });
   }
 
-  const { data: user, error: fetchError } = await supabase
-    .from("users")
-    .select("supabase_user_id, role")
-    .eq("user_id", parseInt(userId))
-    .single();
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
 
-  if (fetchError || !user) {
-    return NextResponse.json({ message: "User not found" }, { status: 404 });
+    if (!user) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    }
+
+    // Cascade deletes sessions via Prisma relations (onDelete: Cascade)
+    await prisma.user.delete({ where: { id: userId } });
+
+    return NextResponse.json({ message: "User deleted successfully" });
+  } catch {
+    return NextResponse.json({ message: "Error deleting user" }, { status: 500 });
   }
-
-  await supabase.from("users").delete().eq("user_id", parseInt(userId));
-
-  await supabase.auth.admin.deleteUser(user.supabase_user_id);
-
-  return NextResponse.json({ message: "User deleted successfully" });
 }

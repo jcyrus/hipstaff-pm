@@ -1,27 +1,27 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const supabase = await createClient();
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { taskId } = await params;
   const { status } = await request.json();
 
-  const { data: updatedTask, error } = await supabase
-    .from("tasks")
-    .update({ status })
-    .eq("id", parseInt(taskId))
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error updating task: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    const updatedTask = await prisma.task.update({
+      where: { id: parseInt(taskId) },
+      data: { status },
+    });
+    return NextResponse.json(updatedTask);
+  } catch {
+    return NextResponse.json({ message: "Error updating task" }, { status: 500 });
   }
-
-  return NextResponse.json(updatedTask);
 }

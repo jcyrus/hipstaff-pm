@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  superadmin
+  admin
+  manager
+  member
+
+  @@map("user_role")
+}
+
+enum AuditAction {
+  user_created
+  user_updated
+  user_deleted
+  user_role_changed
+  user_activated
+  user_deactivated
+  team_created
+  team_updated
+  team_deleted
+  team_member_added
+  team_member_removed
+  invite_created
+  invite_accepted
+  invite_revoked
+
+  @@map("audit_action")
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js required models
+// ---------------------------------------------------------------------------
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Application models
+// ---------------------------------------------------------------------------
+
+model User {
+  id                String    @id @default(cuid())
+  // Auth.js standard fields
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  // App-specific fields
+  username          String    @unique
+  password          String?
+  profilePictureUrl String?
+  role              UserRole  @default(member)
+  isActive          Boolean   @default(true)
+  currentTeamId     Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Auth.js relations
+  accounts Account[]
+  sessions Session[]
+
+  // App relations
+  currentTeam      Team?            @relation("CurrentTeamUsers", fields: [currentTeamId], references: [id])
+  userTeams        UserTeam[]
+  authoredTasks    Task[]           @relation("TaskAuthor")
+  assignedTasks    Task[]           @relation("TaskAssigned")
+  taskAssignments  TaskAssignment[]
+  uploadedFiles    Attachment[]
+  comments         Comment[]
+  ownedTeams       Team[]           @relation("ProductOwner")
+  managedTeams     Team[]           @relation("ProjectManager")
+  createdTeams     Team[]           @relation("TeamCreatedBy")
+  createdInvites   Invite[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+model Team {
+  id                   Int     @id @default(autoincrement())
+  teamName             String
+  productOwnerUserId   String?
+  projectManagerUserId String?
+  createdBy            String?
+  createdAt            DateTime @default(now())
+
+  productOwner   User? @relation("ProductOwner", fields: [productOwnerUserId], references: [id])
+  projectManager User? @relation("ProjectManager", fields: [projectManagerUserId], references: [id])
+  createdByUser  User? @relation("TeamCreatedBy", fields: [createdBy], references: [id])
+
+  currentUsers  User[]        @relation("CurrentTeamUsers")
+  userTeams     UserTeam[]
+  projectTeams  ProjectTeam[]
+  invites       Invite[]
+
+  @@map("teams")
+}
+
+model Project {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+
+  projectTeams ProjectTeam[]
+  tasks        Task[]
+
+  @@map("projects")
+}
+
+model ProjectTeam {
+  id        Int @id @default(autoincrement())
+  teamId    Int
+  projectId Int
+
+  team    Team    @relation(fields: [teamId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("project_teams")
+}
+
+model Task {
+  id             Int       @id @default(autoincrement())
+  title          String
+  description    String?
+  status         String?
+  priority       String?
+  tags           String?
+  startDate      DateTime?
+  dueDate        DateTime?
+  points         Int?
+  projectId      Int
+  authorUserId   String
+  assignedUserId String?
+
+  project        Project          @relation(fields: [projectId], references: [id])
+  author         User             @relation("TaskAuthor", fields: [authorUserId], references: [id])
+  assignee       User?            @relation("TaskAssigned", fields: [assignedUserId], references: [id])
+  taskAssignments TaskAssignment[]
+  attachments    Attachment[]
+  comments       Comment[]
+
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id     Int    @id @default(autoincrement())
+  userId String
+  taskId Int
+
+  user User @relation(fields: [userId], references: [id])
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@map("task_assignments")
+}
+
+model Attachment {
+  id           Int    @id @default(autoincrement())
+  fileUrl      String
+  fileName     String?
+  taskId       Int
+  uploadedById String
+
+  task       Task @relation(fields: [taskId], references: [id])
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@map("attachments")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  text      String
+  taskId    Int
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+model UserTeam {
+  id       Int      @id @default(autoincrement())
+  userId   String
+  teamId   Int
+  role     UserRole @default(member)
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@map("user_teams")
+}
+
+model Invite {
+  id         Int       @id @default(autoincrement())
+  token      String    @unique
+  email      String
+  teamId     Int?
+  role       UserRole  @default(member)
+  createdBy  String
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  team      Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdByUser User @relation(fields: [createdBy], references: [id])
+
+  @@map("invites")
+}
+
+model AuditLog {
+  id         Int         @id @default(autoincrement())
+  action     AuditAction
+  actorId    String
+  targetType String
+  targetId   Int?
+  details    Json?
+  createdAt  DateTime    @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@map("audit_log")
+}

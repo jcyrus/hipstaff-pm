@@ -8,6 +8,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { lightTheme, darkTheme } from "@/app/theme";
 import NextTopLoader from "nextjs-toploader";
+import { SessionProvider } from "next-auth/react";
 
 /**
  * MainLayout - Full dashboard layout with sidebar and navbar.
@@ -48,8 +49,10 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <StoreProvider>
-      <MainLayoutInner>{children}</MainLayoutInner>
-    </StoreProvider>
+    <SessionProvider>
+      <StoreProvider>
+        <MainLayoutInner>{children}</MainLayoutInner>
+      </StoreProvider>
+    </SessionProvider>
   );
 }

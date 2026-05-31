@@ -1,20 +1,21 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createClient();
-
-  const { data: teams, error } = await supabase
-    .from("teams")
-    .select("*")
-    .order("id", { ascending: true });
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error retrieving teams: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(teams);
+  try {
+    const teams = await prisma.team.findMany({
+      orderBy: { id: "asc" },
+    });
+    // Map id → teamId to match RTK Query Team interface
+    return NextResponse.json(teams.map((t) => ({ ...t, teamId: t.id })));
+  } catch {
+    return NextResponse.json({ message: "Error retrieving teams" }, { status: 500 });
+  }
 }

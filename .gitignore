@@ -61,3 +61,8 @@ build/Release
 # Temporary folders
 tmp/
 temp/
+
+/src/generated/prisma
+
+# graphify knowledge graph output
+graphify-out/

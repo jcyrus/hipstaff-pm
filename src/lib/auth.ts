@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 import { UserRole } from "@/lib/rbac/types";
 
 export interface AuthUser {
-  id: number;
-  supabaseUserId: string;
+  id: string;
   email: string;
   username: string;
   role: UserRole;
@@ -17,131 +17,91 @@ export interface AuthUser {
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const supabase = await createClient();
-  
-  const { data: { user: supabaseUser }, error: authError } =
-    await supabase.auth.getUser();
+  const session = await auth();
+  if (!session?.user?.id) return null;
 
-  if (authError || !supabaseUser) {
-    return null;
-  }
+  const userData = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      role: true,
+      isActive: true,
+      currentTeamId: true,
+      userTeams: {
+        select: {
+          teamId: true,
+          role: true,
+          team: { select: { teamName: true } },
+        },
+      },
+    },
+  });
 
-  const { data: userData, error: userError } = await supabase
-    .from("users")
-    .select(`
-      user_id,
-      supabase_user_id,
-      email,
-      username,
-      role,
-      is_active,
-      current_team_id,
-      user_teams (
-        team_id,
-        teams (team_name),
-        role
-      )
-    `)
-    .eq("supabase_user_id", supabaseUser.id)
-    .single();
-
-  if (userError || !userData) {
-    return null;
-  }
-
-  if (!userData.is_active) {
-    return null;
-  }
+  if (!userData || !userData.isActive) return null;
 
   return {
-    id: userData.user_id,
-    supabaseUserId: userData.supabase_user_id,
+    id: userData.id,
     email: userData.email,
     username: userData.username,
     role: userData.role as UserRole,
-    isActive: userData.is_active,
-    currentTeamId: userData.current_team_id || undefined,
-    teams:
-      userData.user_teams?.map((ut) => {
-        // Supabase returns nested relation as object, but types it as array
-        const team = ut.teams as unknown as { team_name: string } | null;
-        return {
-          teamId: ut.team_id,
-          teamName: team?.team_name || "",
-          role: ut.role as UserRole,
-        };
-      }) || [],
+    isActive: userData.isActive,
+    currentTeamId: userData.currentTeamId ?? undefined,
+    teams: userData.userTeams.map((ut) => ({
+      teamId: ut.teamId,
+      teamName: ut.team.teamName,
+      role: ut.role as UserRole,
+    })),
   };
 }
 
-export async function getUserRole(userId: number): Promise<UserRole | null> {
-  const supabase = await createClient();
-
-  const { data } = await supabase
-    .from("users")
-    .select("role")
-    .eq("user_id", userId)
-    .single();
-
-  return data?.role as UserRole || null;
+export async function getUserRole(userId: string): Promise<UserRole | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return (user?.role as UserRole) ?? null;
 }
 
 export async function switchTeam(
-  userId: number,
+  userId: string,
   teamId: number
 ): Promise<void> {
-  const supabase = await createClient();
-
-  await supabase
-    .from("users")
-    .update({ current_team_id: teamId })
-    .eq("user_id", userId);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { currentTeamId: teamId },
+  });
 }
 
 export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser();
-  
-  if (!user) {
-    throw new Error("Unauthorized: No valid user session");
-  }
-
+  if (!user) throw new Error("Unauthorized: No valid user session");
   return user;
 }
 
 export async function requireRole(requiredRole: UserRole): Promise<AuthUser> {
   const user = await requireAuth();
-  
-  if (user.role !== requiredRole) {
+  if (user.role !== requiredRole)
     throw new Error(`Forbidden: Requires ${requiredRole} role`);
-  }
-
   return user;
 }
 
-export async function requireAnyRole(
-  roles: UserRole[]
-): Promise<AuthUser> {
+export async function requireAnyRole(roles: UserRole[]): Promise<AuthUser> {
   const user = await requireAuth();
-  
-  if (!roles.includes(user.role)) {
+  if (!roles.includes(user.role))
     throw new Error(`Forbidden: Requires one of ${roles.join(", ")} roles`);
-  }
-
   return user;
 }
 
 export async function requireSuperAdmin(): Promise<AuthUser> {
-  return await requireRole(UserRole.SuperAdmin);
+  return requireRole(UserRole.SuperAdmin);
 }
 
 export async function requireAdmin(): Promise<AuthUser> {
-  return await requireAnyRole([UserRole.SuperAdmin, UserRole.Admin]);
+  return requireAnyRole([UserRole.SuperAdmin, UserRole.Admin]);
 }
 
 export async function requireManagerOrAbove(): Promise<AuthUser> {
-  return await requireAnyRole([
-    UserRole.SuperAdmin,
-    UserRole.Admin,
-    UserRole.Manager,
-  ]);
+  return requireAnyRole([UserRole.SuperAdmin, UserRole.Admin, UserRole.Manager]);
 }

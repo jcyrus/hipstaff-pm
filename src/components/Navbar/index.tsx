@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Menu, Moon, Search, Settings, Sun, LogOut, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { useAppDispatch, useAppSelector } from "@/app/redux";
 import { setIsDarkMode, setIsSidebarCollapsed } from "@/state";
 import {
@@ -19,11 +20,11 @@ import {
   Divider,
   Typography,
 } from "@mui/material";
-import { getSupabaseClient } from "@/lib/supabase/client";
 
 const NavBar = () => {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const { data: session } = useSession();
   const isSidebarCollapsed = useAppSelector(
     (state) => state.global.isSidebarCollapsed
   );
@@ -31,36 +32,19 @@ const NavBar = () => {
   const theme = useTheme();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userInitials, setUserInitials] = useState<string>("U");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuOpen = Boolean(anchorEl);
 
-  useEffect(() => {
-    async function fetchUser() {
-      const supabase = getSupabaseClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email ?? null);
-        // Generate initials from email or user metadata
-        const name =
-          user.user_metadata?.full_name || user.user_metadata?.name || user.email;
-        if (name) {
-          const parts = name.split(/[@\s]/);
-          setUserInitials(
-            parts
-              .slice(0, 2)
-              .map((p: string) => p[0]?.toUpperCase() ?? "")
-              .join("")
-          );
-        }
-      }
-    }
-    fetchUser();
-  }, []);
+  const userEmail = session?.user?.email ?? null;
+  const userInitials = userEmail
+    ? userEmail
+        .split("@")[0]
+        .split(/[\s._-]/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? "")
+        .join("") || "U"
+    : "U";
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -73,8 +57,7 @@ const NavBar = () => {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     handleMenuClose();
-    const supabase = getSupabaseClient();
-    await supabase.auth.signOut();
+    await signOut({ redirect: false });
     router.push("/login");
     router.refresh();
   };

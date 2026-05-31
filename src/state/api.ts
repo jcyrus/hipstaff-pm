@@ -24,12 +24,11 @@ export enum Status {
 }
 
 export interface User {
-  userId?: number;
+  userId?: string;
   username: string;
   email: string;
   profilePictureUrl?: string;
-  supabaseUserId?: string;
-  teamId?: number;
+  teamId?: string;
 }
 
 export interface Attachment {

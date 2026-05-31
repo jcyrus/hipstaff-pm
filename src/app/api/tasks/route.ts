@@ -1,69 +1,65 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get("projectId");
 
   if (!projectId) {
-    return NextResponse.json(
-      { message: "projectId is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: "projectId is required" }, { status: 400 });
   }
 
-  const { data: tasks, error } = await supabase
-    .from("tasks")
-    .select(
-      `
-      *,
-      author:users!tasks_author_user_id_fkey(*),
-      assignee:users!tasks_assigned_user_id_fkey(*),
-      comments(*),
-      attachments(*)
-    `
-    )
-    .eq("project_id", parseInt(projectId));
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error retrieving tasks: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { projectId: parseInt(projectId) },
+      include: {
+        author: true,
+        assignee: true,
+        comments: true,
+        attachments: true,
+      },
+    });
+    return NextResponse.json(tasks);
+  } catch {
+    return NextResponse.json({ message: "Error retrieving tasks" }, { status: 500 });
   }
-
-  return NextResponse.json(tasks);
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const body = await request.json();
-
-  const { data: newTask, error } = await supabase
-    .from("tasks")
-    .insert({
-      title: body.title,
-      description: body.description,
-      status: body.status,
-      priority: body.priority,
-      tags: body.tags,
-      start_date: body.startDate,
-      due_date: body.dueDate,
-      points: body.points,
-      project_id: body.projectId,
-      author_user_id: body.authorUserId,
-      assigned_user_id: body.assignedUserId,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error creating a task: ${error.message}` },
-      { status: 500 }
-    );
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(newTask, { status: 201 });
+  const body = await request.json();
+
+  try {
+    const newTask = await prisma.task.create({
+      data: {
+        title: body.title,
+        description: body.description ?? null,
+        status: body.status ?? null,
+        priority: body.priority ?? null,
+        tags: body.tags ?? null,
+        startDate: body.startDate ? new Date(body.startDate) : null,
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        points: body.points ?? null,
+        projectId: body.projectId,
+        authorUserId: user.id,
+        assignedUserId: body.assignedUserId ?? null,
+      },
+    });
+    return NextResponse.json(newTask, { status: 201 });
+  } catch {
+    return NextResponse.json({ message: "Error creating task" }, { status: 500 });
+  }
 }

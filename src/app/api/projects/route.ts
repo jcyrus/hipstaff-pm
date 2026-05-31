@@ -1,40 +1,44 @@
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createClient();
-
-  const { data: projects, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("id", { ascending: true });
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error retrieving projects: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(projects);
+  try {
+    const projects = await prisma.project.findMany({
+      orderBy: { id: "asc" },
+    });
+    return NextResponse.json(projects);
+  } catch {
+    return NextResponse.json({ message: "Error retrieving projects" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { name, description, startDate, endDate } = await request.json();
-
-  const { data: newProject, error } = await supabase
-    .from("projects")
-    .insert({ name, description, start_date: startDate, end_date: endDate })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { message: `Error creating a project: ${error.message}` },
-      { status: 500 }
-    );
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(newProject, { status: 201 });
+  const { name, description, startDate, endDate } = await request.json();
+
+  try {
+    const newProject = await prisma.project.create({
+      data: {
+        name,
+        description: description ?? null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+      },
+    });
+    return NextResponse.json(newProject, { status: 201 });
+  } catch {
+    return NextResponse.json({ message: "Error creating project" }, { status: 500 });
+  }
 }
